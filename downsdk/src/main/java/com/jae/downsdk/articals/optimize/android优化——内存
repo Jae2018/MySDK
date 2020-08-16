@@ -1,0 +1,134 @@
+参考链接：https://blog.csdn.net/carson_ho/article/details/79549417
+见图：android-内存泄漏分类汇总.jpg
+
+Android中进程内存
+  分配策略：AMS集中管理所有进程的内存分配
+  回收策略：
+    步骤1：Application Framework 决定回收的进程类型
+        Android中的进程是托管的；当进程空间紧张时，会按进程优先级低到高的顺序，自动回收进程
+    步骤2：Linux 内核真正回收具体进程
+        ActivityManagerService 对所有进程进行评分（评分存放在变量adj中）
+        更新评分到Linux 内核
+        由Linux 内核完成真正的内存回收
+
+Android中对象、变量内存
+  分配策略
+    对象 / 变量的内存分配 由程序自动 负责
+    共有3种：静态分配、栈式分配、 & 堆式分配，分别面向静态变量、局部变量 & 对象实例
+    详情见图android对象内存分配策略.png
+  内存释放策略
+    对象 / 变量的内存释放 由Java垃圾回收器（GC） / 帧栈 负责
+    静态分配不需释放、栈式分配仅 通过帧栈自动出、入栈，
+    对象分配（即堆式分配）的内存释放策略 = Java垃圾回收器（GC）
+
+常见的内存问题如下
+  - 内存泄露
+  - 内存抖动
+  - 图片Bitmap相关
+  - 代码质量 & 数量
+  - 日常不正确使用
+  在Java中，非静态内部类 & 匿名内部类都默认持有 外部类的引用。
+  ML （Memory Leak），指 程序在申请内存后，当该内存不需再使用 但 却无法被释放 & 归还给 程序的现象
+  容易使得应用程序发生内存溢出，即 OOM（超出系统所分配内存大小）。
+
+常见的内存泄露原因 & 解决方案
+
+    集合类：添加对象后，使用完必须从集合中删除。释放集合：clear后设为null
+
+    Static关键字修饰的成员变量：不要引用资源耗费过多的实例（如 Context）
+            解决方案
+                    - 若需引用 Context，则尽量使用Application的Context
+                    - 使用 弱引用（WeakReference） 代替 强引用 持有实例
+
+    非静态内部类 / 匿名类：非静态内部类默认持有外部类的引用而导致外部类无法释放，最终造成ML
+            解决方案
+                    - 将非静态内部类设置为：静态内部类（静态内部类默认不持有外部类的引用）
+                    - 该内部类抽取出来封装成一个单例
+                    - 尽量 避免 非静态内部类所创建的实例 = 静态
+
+    多线程：AsyncTask、实现Runnable接口、继承Thread类：由于工作线程实例持有外部类引用，导致ML
+           - 将使得外部类无法被垃圾回收器（GC）回收，使用静态内部类或在外部类结束生命周期时，
+           强制结束线程。
+           - 使用线程池进行管理
+
+    handler：静态内部类+弱引用；或者在外部类结束时调用removeCallbacksAndMessages(null);
+
+    图片资源Bitmap相关：
+        使用完毕后若不释放图片资源，容易造成ML，从而导致OOM
+          a. 在 Android2.3.3（API 10）前，调用 Bitmap.recycle()方法
+          b. 在 Android2.3.3（API 10）后，采用软引用（SoftReference）
+        根据分辨率适配 & 缩放图片，inSampleSize设置>=2
+        按需设置inPreferredConfig，不同的图片解码方式对应的内存占用大小相差很大，具体如下：
+          ARBG_4444 = 2；ARBG_8888 = 4；RBG_565=2(无透明度)；ALPHA_8=1(无颜色值)
+
+    资源对象使用后未关闭：对于资源的使用（如 广播BraodcastReceiver、文件流File、数据库游标Cursor、图片
+    资源Bitmap等），若在Activity销毁时无及时关闭 / 注销这些资源，则这些资源将不会被回收，从而造成ML
+        // 对于 广播BraodcastReceiver：注销注册
+        try{
+            getContext().unregisterReceiver(receiver)
+        }cache(){}
+        // 对于 文件流File：关闭流
+        InputStream / OutputStream.close()
+        // 对于数据库游标cursor：使用后关闭游标
+        cursor.close（）
+        cursor = null
+        // 对于 图片资源Bitmap：Android分配给图片的内存只有8M，若1个Bitmap对象占内存较多，当它不再被使用时，应调用recycle()回收此对象的像素所占用的内存；最后再赋为null
+        Bitmap.recycle()；
+        Bitmap = null;
+        // 对于动画（属性动画）
+        // 将动画设置成无限循环播放repeatCount = “infinite”后
+        // 在Activity退出时记得停止动画
+
+    WebView导致的内存泄漏：
+        1.避免在xml布局文件中直接嵌套webview控件，而是采用addview的方式new一个webview并加载到布局中，
+        上下文变量使用applicationContext。
+          例：     webView = new WebView(getApplicationContext());
+                   webView.getSettings().setJavaScriptEnabled(true);
+                   framelayout.addView(webView);
+                   webView.loadUrl(url);
+        2.当activity生命周期结束时及时销毁/释放资源
+          例：  @Override
+                protected void onDestroy() {
+                    if (webView != null) {
+                        ViewParent parent = webView.getParent();
+                        if (parent != null) {
+                            ((ViewGroup) parent).removeView(webView);
+                        }
+                        webView.stopLoading();
+                        webView.getSettings().setJavaScriptEnabled(false);
+                        webView.clearHistory();
+                        webView.removeAllViews();
+                        webView.destroy();
+                    }
+                    super.onDestroy();
+                }
+
+内存抖动，尽量避免频繁创建大量、临时的小对象
+
+代码质量 & 数量
+  代码本身的质量（如 数据结构、数据类型等） & 数量（代码量的大小）可能会导致大量的内存问题，
+  如占用内存大、内存利用率低等。
+
+注：
+    还有1个内存优化的终极方案：调大 虚拟机Dalvik的堆内存大小
+    即 在AndroidManifest.xml的application标签中增加一个android:largeHeap属性（值 = true），
+    从而通知虚拟机 应用程序需更大的堆内存。但不建议 & 不鼓励该做法
+
+优化小技巧：
+    技巧1：获取当前可使用的内存大小
+    调用 ActivityManager.getMemoryClass（）方法可获取当前应用可用的内存大小（单位 = 兆）
+    技巧2：获取当前的内存使用情况
+    在应用生命周期的任何阶段，调用 onTrimMemory()获取应用程序当前内存使用情况（以内存级别进行识别），
+    可根据该方法返回的内存紧张级别参数来释放内存
+    技巧3：当视图变为隐藏状态时，则释放内存
+    当用户跳转到不同的应用 & 视图不再显示时, 应释放应用视图所占的资源。(注：此时释放所占用的资源能显著
+    的提高系统的缓存处理容量具体操作：实现当前Activity类的onTrimMemory()后，当用户离开视图时会得到通
+    知；若得到返回的参数 = TRIM_MEMORY_UI_HIDDEN 即代表视图变为隐藏状态，则可释放视图所占用的资源。)
+
+相关工具：
+    MAT(Memory Analysis Tools)
+    Heap Viewer
+    Allocation Tracker
+    Memory Monitor
+    LeakCanary
+

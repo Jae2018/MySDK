@@ -1,0 +1,29 @@
+
+1、使用 Android Size Analyzer(plugin->install) 分析项目，根据提示进行相应优化
+2、缩减资源数量和大小
+    - 使用lint检查移除未使用的资源，gradlew lint
+    - 把图片转换为 webp 格式或者使用 .9 图
+    - gradle的buildType中添加 shrinkResources true
+    - 尽量减少库中的资源使用量，若可编译可去掉无用资源、代码
+    - 仅支持特定密度，使用图片的单个变体
+    - 自己编写XML文件代替图片文件
+    - 使用着色器复用图片：tint，tintMode，ColorFilter；还可以省略仅是另一个资源的旋转等效项的资源
+      例:   <?xml version="1.0" encoding="utf-8"?> （旋转180度）
+            <rotate xmlns:android="http://schemas.android.com/apk/res/android"
+                android:drawable="@drawable/ic_thumb_up"
+                android:pivotX="50%"
+                android:pivotY="50%"
+                android:fromDegrees="180" />
+    - 从代码进行渲染
+    - 使用 aapt 压缩 res/drawable/ 中的 PNG 文件
+        aaptOptions {
+            cruncherEnabled = false
+        }
+    - 使用pngcrush 工具压缩PNG图片，压缩 JPEG 文件，可以使用 packJPG 和 guetzli3
+    - 使用矢量图形 VectorDrawable 显示小图片
+    - 使用 AnimatedVectorDrawableCompat 创建动画矢量可绘制资源，而不是 AnimationDrawable
+    - 减少原生和 Java 代码：移除不必要的生成代码；避免使用枚举；缩减原生二进制文件的大小
+      可以使用 Android NDK 中提供的 arm-eabi-strip 工具从原生库中移除不必要的调试符号
+
+
+注意：仅当启动器图标使用 PNG 格式时，Google Play 才会接受 APK

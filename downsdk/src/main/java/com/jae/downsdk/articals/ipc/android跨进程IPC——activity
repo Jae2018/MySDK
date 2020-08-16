@@ -1,0 +1,31 @@
+Android的进程间数据交互的4种方法
+
+1、activity相关
+    - 系统自带方法，例如 打电话、相机拍照回调
+    - 在AndroidManifest.xml文件中给要共享的Activity指定Action和访问协议：
+        <activity android:name="com.sarnasea.interprocess.ShareActivity">
+            <intent-filter>
+                <action android:name="com.sarnasea.interprocess.MYACTION"/>
+                <data android:scheme="message"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity>
+    - 获得其他应用程序传递过来的数据：
+		// 获得其他应用程序传递过来的数据
+		Uri data = getIntent().getData();
+		if (data != null) {
+			//获得Host,也就是message://后面的主体内容
+			String host = data.getHost();
+			Toast.makeText(this, host, Toast.LENGTH_SHORT).show();
+		}
+
+		Bundle bundle = getIntent().getExtras();
+		if(bundle != null){
+			//获得其他应用程序调用该Activity时传递过来的Extras数据
+			String value = bundle.getString("value");
+			Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
+		}
+    跨进程访问Activity（访问其他应用程序中的Activity）主要是通过一个Action来完成的，如果要传递数据，
+    还需要指定一个Uri。当然，传递数据也可以通过Intent来完成。传递数据的过程可以是双向的。如果要想从
+    调用的Activity中返回数据，就需要使用startActivityForResult方法来启动Activity了。
+

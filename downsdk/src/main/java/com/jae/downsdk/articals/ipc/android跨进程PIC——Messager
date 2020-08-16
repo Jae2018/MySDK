@@ -1,0 +1,10 @@
+Messenger也可以作为Android多进程的一种通信方式，通过构建Message来在客户端和服务端之间传递数据
+
+本质：Messenger内部封装了Handler，通过此Handler传输数据，由于是同一个IBinder引用，共用一个Binder驱动，
+因此就实现了数据交互的闭环
+
+1、构建一个其他进程的组件
+2、服务端常见一个 Handler 处理来自客户端的消息，将此 Handler 设置给 Messenger
+3、将 Messenger 对象的 Binder 返回给客户端/ 客户端获取到此 Messenger 的 Binder
+4、客户端通过服务端的 IBinder 对象生成对应 Messenger，并通过 Messenger 向服务端发送数据
+5、服务端如果要回复消息给客户端，那就要用到 Message 的 replyTo 获取到对应 Messenger

@@ -1,0 +1,8 @@
+
+
+一个activity层级：activity > phoneWindow > decorView > titleView(actionBar) + contentParent(viewGroup)
+每个activity都对应一个window，window是在activity.attach()的时候创建的；
+setContentView()最终是调用的window中的此方法，此时会去初始化 decorView
+decorView 之下是 actionBar 与 contentParent，contentParent > frameLayout > 定义的**.xml文件
+
+viewManger(接口) > windowManger(接口) > windowMangerImpl(中间件) > windowMangerGlobal(最终实现类，单个进程唯一)

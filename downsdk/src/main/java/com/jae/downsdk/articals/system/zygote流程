@@ -1,0 +1,32 @@
+init进程会启动ServiceManager，孵化一些守护进程，并解析init.rc孵化Zygote进程。
+Zygote初始化后，会注册一个等待接受消息的socket，OS层会采用socket进行IPC通信。
+zygote是所有java进程的起点。
+
+文件调用流程：/vendor/default.prop > /init.rc > /init.zygote64_32.rc > system/bin/app_process64程序
+
+frameworks/base/cmds/app_process/app_main.cpp
+    解析app_process的参数
+    设置当前进程名由app_process改为zygote
+    调用AndroidRuntime#start()方法
+frameworks\base\core\jni\AndroidRuntime.cpp
+    启动虚拟机
+    注册JNI函数
+    调用ZygoteInit.main()方法(c -> java)
+
+ZygoteInit.java类相关方法
+    ZygoteInit.main()
+        预加载类和资源，包括颜色，R文件、drawable类等
+        创建SystemServer进程
+        创建ZygoteServer，开启一个死循环，等待着接收ActivityManagerService的socket请求，
+        即创建应用程序进程请求
+
+    ZygoteInit.forkSystemServer(**)
+        创建SystemServer进程
+        一些常规初始化
+        初始化Binder机制，用于SystemServer与其他进程的通信（如应用进程、ServiceManager进程等）
+        调用SystemServer.java的入口函数main() -> run()
+    System Server是Zygote孵化的第一个进程。SystemServer负责启动和管理整个Java framework，
+    包含AMS，PMS等服务。
+    Zygote进程孵化的第一个App进程是Launcher。
+
+

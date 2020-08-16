@@ -1,0 +1,33 @@
+1、针对 App 启动速度、流畅性
+   采用 异步加载(多线程)、分步加载、延期加载的策略，减少启动应用时加载的任务，从而提高启动速度
+   例：activity中减少onCreate()时间，部分代码放在onResume()中实现，对于一次性的氪设定个Boolean
+   值按需加载代码段；
+   减少层级、即可减少findViewByID的时间，多用include、merge、ViewStub，
+   使用 Hierarchy Viewer 及 layoutInspector 工具进行优化
+   尽可能少用布局属性 wrap_content，减少测量计算时间
+   提高adapter、adapterView的效率，复用item、缓存数据、分页显示，滑动监听处理是否加载
+   耗时操作放在后台线程处理，仅在处理完后通知主线程更新UI
+
+2、针对 UI 页面显示速度
+   降低View.onDraw()的复杂度，不要创建新的局部对象，避免执行大量 & 耗时操作
+   优化方案1： 移除默认的 Window 背景或者设置为透明
+   优化方案2： 移除控件中不必要的背景
+   优化方案3： 减少布局文件的层级（减少不必要的嵌套）
+   优化方案4： 自定义控件View优化：使用 clipRect() 、quickReject()
+   其他优化方案：
+               使用OpenGL绘图，提高绘图性能
+               尽量为所有分辨率创建资源
+               使用语言 RenderJavaScript
+
+3、针对响应速度
+   使用多线程，将大量 & 耗时操作放在工作线程中执行
+   多线程的方式 包括：AsyncTask、继承 Thread类、实现 Runnable接口、Handler消息机制、HandlerThread等
+   注：实际开发中，当一个进程发生了ANR后，系统会在 /data/anr目录下创建一个文件 traces.txt，通过分析该
+   文件可定位出ANR的原因
+
+4、其他优化方案
+   合理的刷新机制，尽量减少刷新次数、避免后台存在消耗资源多的线程、缩小刷新区域
+   动画的使用，根据不同场景选择合适的动画框架，使用硬件加速的方式提高流畅度，使用动画后需停止动画
+
+优化相关工具
+    Hierarchy Viewer，Lint，Systrace，batteryOption

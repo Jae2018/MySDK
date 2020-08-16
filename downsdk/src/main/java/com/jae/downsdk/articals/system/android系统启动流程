@@ -1,0 +1,44 @@
+android基于Linux系统。
+
+Linux系统启动流程：通电后，cpu的硬件逻辑强行将CS:IP(代码段寄存器:指令寄存器)的值
+设置为BIOS的内存地址0xFFFF0，来加载BIOS汇编指令来进行计算机自检，完成后会发送int
+0x19中断到cpu，cpu会找到对应中断服务程序将硬盘中第一个扇区的引导程序加在到内存中的指定位置。
+随后，在引导程序的作用下，陆续将操作系统的其他程序载入内存，完成实模式到保护模式的转变，
+为执行操作系统的入口函数main做准备，后面就是操作系统的初始化工作了，最后完成计算机的启动。
+
+android手机启动过程：
+类似Linux，但是没有BIOS，取而代之的是BootLoader(系统启动加载器)
+它类似于BIOS，在系统加载前，用以初始化硬件设备，建立内存空间的映像图，为最终调用系统内核准备好环境。
+在Android里没有硬盘，而是ROM，它类似于硬盘存放操作系统，用户程序等。ROM跟硬盘一样也会划分为不同的区域，
+用于放置不同的程序，在Android中主要划分为一下几个分区：
+
+    /boot：存放引导程序，包括内核和内存操作程序
+    /system：相当于电脑c盘，存放Android系统及系统应用
+    /recovery：恢复分区，可以进入该分区进行系统恢复
+    /data：用户数据区，包含了用户的数据：联系人、短信、设置、用户安装的程序
+    /cache：安卓系统缓存区，保存系统最常访问的数据和应用程序
+    /misc：包含一些杂项内容，如系统设置和系统功能启用禁用设置
+    /sdcard：用户自己的存储区，可以存放照片，音乐，视频等文件
+
+那么Bootloader是如何被加载的呢？我们可以想到，应该跟pc一样，当开机加电的时候，cpu会从cpu制造厂商
+预设的地址上取指令，这个地址是各厂商约定俗称的，类似于上面80x86架构里的0xFFFF0地址，因此Android手
+机会将固态存储设备ROM预先映射到该地址上，当开机加电的时候，cpu就会从该地址执行/boot分区下的
+Bootloader程序，载入linux内核到RAM中。
+
+当linux内核启动后会初始化各种软硬件环境，加载驱动程序，挂载根文件系统，并开始执行根文件系统的init程序，
+init程序是Android启动过程中最重要的核心程序。
+
+init进程是Android系统中用户进程的鼻祖进程。init进程会启动各种系统本地服务，如：Media Server、
+Service Manager、bootanim（开机动画）等。init进程会在解析init.rc文件后fork出Zygote，而Zygote
+是所有Java进程的父进程，我们的App都是由Zygote fork出来的。
+
+Zygote进程主要包含：
+    加载ZygoteInit类，注册Zygote Socket服务端套接字
+    加载虚拟机
+    预加载Android核心类
+    预加载系统资源
+随后Zygote进程会fork出System Server进程，System Server进程负责启动和管理整个framework，
+包括Activity Manager，PowerManager等服务。
+当System Server将系统服务启动就绪后，就会通知ActivityManager启动首个Android程序Home，
+即我们看到的桌面程序。
+至此，从Android手机开机到看到桌面程序所有过程分析完了。(图 -> assert/android-boot.png)

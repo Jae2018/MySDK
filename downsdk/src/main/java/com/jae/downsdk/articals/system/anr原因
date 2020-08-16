@@ -1,0 +1,35 @@
+一、android系统下ANR产生原因
+
+` 主线程耗时操作，主线程阻塞或主线程数据读取
+解决办法：避免死锁的出现，使用子线程来处理耗时操作或阻塞任务。
+尽量避免在主线程query provider、不要滥用SharePreferenceS
+
+` CPU满负荷，I/O阻塞
+解决办法：文件读写或数据库操作放在子线程异步操作。
+
+` 内存不足
+解决办法：AndroidManifest.xml文件<applicatiion>中可以设置 android:largeHeap="true"，以此增大App使用内存。
+不过不建议使用此法，从根本上防止内存泄漏，优化内存使用才是正道。
+
+` 各大组件造成的ANR
+-service ANR流程：
+1. Service创建之前会延迟发送一个消息，而这个消息就是ANR的起源；
+2. Service创建完毕，在规定的时间之内执行完毕onCreate()方法就移除这个消息，就不会产生ANR了；
+3. 在规定的时间之内没有完成onCreate()的调用，消息被执行，ANR发生。
+-BroadcastReceiver ANR：
+每次广播到来时，会重新创建 BroadcastReceiver 对象，并且调用 onReceive() 方法，执行完以后
+该对象即被销毁。当 onReceive() 方法在 10 秒内没有执行完毕，Android 会认为该程序无响应。所
+以在BroadcastReceiver里不能做一些比较耗时的操作，否侧会弹出 ANR(Application No Response)的对话框。
+-ContentProvider Timeout是位于”ActivityManager”线程中的AMS：
+MainHandler收到CONTENT_PROVIDER_PUBLISH_TIMEOUT_MSG消息时触发。
+
+` 其他进程间接引起，例如：
+当前应用进程进行进程间通信请求其他进程，其他进程的操作长时间没有反馈；
+其他进程的CPU占用率高，使得当前应用进程无法抢占到CPU时间片；
+
+超时时间：
+对于前台服务，则超时为SERVICE_TIMEOUT = 20s；
+对于后台服务，则超时为SERVICE_BACKGROUND_TIMEOUT = 200s
+对于前台广播，则超时为BROADCAST_FG_TIMEOUT = 10s；
+对于后台广播，则超时为BROADCAST_BG_TIMEOUT = 60s;
+ContentProvider超时为CONTENT_PROVIDER_PUBLISH_TIMEOUT = 10s;

@@ -1,0 +1,6 @@
+include ':logger'
+include ':sample'
+include ':phonecalling'
+rootProject.name='MySDK'
+include ':app'
+include ':downsdk'

@@ -1,0 +1,86 @@
+(launcher进程) AMP —(startActivity)—> AMS =(创建新进程请求)=> zygote =(fork新进程 > app进程)=> AMP
+—(attachApplication)—> AMS —(realStartActivityLocked)—> AppThreadProxy —(scheduleLaunchActivity)—>
+AppThread —(sendMsg:H.LAUNCH_ACTIVITY)—> ActivityThread —(handleLaunchActivity)—> Activity.onCreate
+
+相关函数：
+ActivityStack：Activity在AMS的栈管理，用来记录已经启动的Activity的先后关系，状态信息等。通过ActivityStack决定是否需要启动新的进程。
+ActivitySupervisor：管理 activity 任务栈
+ActivityThread：ActivityThread 运行在UI线程（主线程），App的真正入口。
+ApplicationThread：用来实现AMS和ActivityThread之间的交互。
+ApplicationThreadProxy：ApplicationThread 在服务端的代理。AMS就是通过该代理与ActivityThread进行通信的。
+IActivityManager：继承与IInterface接口，抽象出跨进程通信需要实现的功能
+AMN：运行在server端（SystemServer进程）。实现了Binder类，具体功能由子类AMS实现。
+AMS：AMN的子类，负责管理四大组件和进程，包括生命周期和状态切换。AMS因为要和ui交互，所以极其复杂，涉及window。
+AMP：AMS的client端代理（app进程）。了解Binder知识可以比较容易理解server端的stub和client端的proxy。AMP和AMS通过Binder通信。
+Instrumentation：程序检测代码的基类，在程序启动之前实例化，用于监控系统与应用之间所有的交互。
+ActivityStackSupervisor：负责所有Activity栈的管理。内部管理了mHomeStack、mFocusedStack和mLastFocusedStack三个Activity栈。
+其中，mHomeStack管理的是Launcher相关的Activity栈；
+mFocusedStack管理的是当前显示在前台Activity的Activity栈；
+mLastFocusedStack管理的是上一次显示在前台Activity的Activity栈。
+
+
+Activity启动流程（从Launcher开始）：
+
+第一阶段： Launcher通知AMS要启动新的Activity（在Launcher所在的进程执行）
+    Launcher.startActivitySafely //首先Launcher发起启动Activity的请求
+    Activity.startActivity
+    Activity.startActivityForResult
+    Instrumentation.execStartActivity //交由Instrumentation代为发起请求
+    ActivityManager.getService().startActivity //通过IActivityManagerSingleton.get()得到一个AMP代理对象
+    ActivityManagerProxy.startActivity //通过AMP代理通知AMS启动activity
+
+第二阶段：AMS先校验一下Activity的正确性，如果正确的话，会暂存一下Activity的信息。
+然后，AMS会通知Launcher程序pause Activity（在AMS所在进程执行）
+    ActivityManagerService.startActivity
+    ActivityManagerService.startActivityAsUser
+    ActivityStackSupervisor.startActivityMayWait
+    ActivityStackSupervisor.startActivityLocked ：检查有没有在AndroidManifest中注册
+    ActivityStackSupervisor.startActivityUncheckedLocked
+    ActivityStack.startActivityLocked ：判断是否需要创建一个新的任务来启动Activity。
+    ActivityStack.resumeTopActivityLocked ：获取栈顶的activity，并通知Launcher应该pause掉这个Activity以便启动新的activity。
+    ActivityStack.startPausingLocked
+    ApplicationThreadProxy.schedulePauseActivity
+
+第三阶段： pause Launcher的Activity，并通知AMS已经paused（在Launcher所在进程执行）
+    ApplicationThread.schedulePauseActivity
+    ActivityThread.queueOrSendMessage
+    H.handleMessage  msg: H.LAUNCH_ACTIVITY
+    ActivityThread.handlePauseActivity
+    ActivityManagerProxy.activityPaused
+
+第四阶段：检查activity所在进程是否存在，如果存在，就直接通知这个进程，在该进程中启动Activity；
+不存在的话，会调用Process.start创建一个新进程（执行在AMS进程）
+    ActivityManagerService.activityPaused
+    ActivityStack.activityPaused
+    ActivityStack.completePauseLocked
+    ActivityStack.resumeTopActivityLocked
+    ActivityStack.startSpecificActivityLocked
+    ActivityManagerService.startProcessLocked
+    Process.start //在这里创建了新进程，新的进程会导入ActivityThread类，并执行它的main函数
+
+第五阶段： 创建ActivityThread实例，执行一些初始化操作，并绑定Application。
+如果Application不存在，会调用LoadedApk.makeApplication创建一个新的Application对象。
+之后进入Loop循环。（执行在新创建的app进程）
+    ActivityThread.main
+    ActivityThread.attach(false) //声明不是系统进程
+    ActivityManagerProxy.attachApplication
+
+第六阶段：处理新的应用进程发出的创建进程完成的通信请求，并通知新应用程序进程启动目标Activity组件（执行在AMS进程）
+    ActivityManagerService.attachApplication //AMS绑定本地ApplicationThread对象，后续通过ApplicationThreadProxy来通信。
+    ActivityManagerService.attachApplicationLocked
+    ActivityStack.realStartActivityLocked //真正要启动Activity了！
+    ApplicationThreadProxy.scheduleLaunchActivity //AMS通过ATP通知app进程启动Activity
+
+第七阶段： 加载MainActivity类，调用onCreate声明周期方法（执行在新启动的app进程）
+    ApplicationThread.scheduleLaunchActivity //ApplicationThread发消息给AT
+    ActivityThread.queueOrSendMessage
+    H.handleMessage //AT的Handler来处理接收到的LAUNCH_ACTIVITY的消息
+    ActivityThread.handleLaunchActivity
+    ActivityThread.performLaunchActivity
+    Instrumentation.newActivity //调用Instrumentation类来新建一个Activity对象
+    Instrumentation.callActivityOnCreate
+    MainActivity.onCreate
+    ActivityThread.handleResumeActivity
+    AMP.activityResumed
+    AMS.activityResumed(AMS进程)
+    MainActivity.onResume

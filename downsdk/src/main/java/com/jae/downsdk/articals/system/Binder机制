@@ -1,0 +1,14 @@
+传统的Linux进程间通信(IPC): 管道（Pipe）、信号（Signal）和跟踪（Trace）、插口（Socket）、
+报文队列（Message）、共享内存（Share Memory）和信号量（Semaphore）。
+Android进程间通信(IPC): 主要是binder，少部分socket方式。
+
+IPC                    数据拷贝次数       控制难度      安全性
+共享内存                     0              难           低
+Binder                      1               易           高
+Socket/管道/消息队列         2               易           低
+
+Binder基于Client-Server通信模式，传输过程只需一次拷贝，为发送发添加UID/PID身份，既支持实名Binder
+也支持匿名Binder，安全性高；定义了4个角色：Server(提供服务的进程)、Client(使用服务的进程)、
+ServerManager(管理service注册与查询，map存储client name - binder，类似于路由器)、
+Binder驱动(通过内存映射，即调用mmap()方法创建数据接收的缓存空间)，前三者是在用户空间，后者在内核空间。
+

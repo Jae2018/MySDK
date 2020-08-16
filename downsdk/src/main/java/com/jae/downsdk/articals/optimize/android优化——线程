@@ -1,0 +1,21 @@
+注：非静态内部类与匿名内部类默认持有外部类引用，弱引用或改成静态类或单独一个文件
+多进程：设置 android:process
+
+Android 的单线程模式必须遵守两条规则(每个线程至少需要占用 64k 内存)：
+1、不要阻塞 UI 线程
+2、不要在 UI 线程之外访问 Android UI 工具包
+
+工作线程更新UI方法：
+    Activity.runOnUiThread(Runnable)
+    View.post(Runnable)
+    View.postDelayed(Runnable, long)
+    使用 handler 或者扩展 AsyncTask
+
+JVW是抢占式调度模型，设定线程名，根据线程正在执行的工作类型设置其优先级，
+CPU 只能并行处理少量线程。可采用viewModel 和 liveData 去管理线程生命周期问题
+
+AsyncTask 是按顺序执行作业，并且容易出现阻塞。
+HandlerThread 是处理程序线程：实际上是一个长时间运行的线程，会从队列中抓取工作并对其进行操作
+ThreadPoolExecutor 线程池管理，适合多线程并发
+
+采用 Hook 手段锁定线程创建者

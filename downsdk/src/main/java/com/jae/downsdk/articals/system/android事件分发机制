@@ -1,0 +1,36 @@
+Android事件分发流程 = Activity -> ViewGroup -> View
+
+由于activity的window是phoneWindow，phoneWindow下是decorView，而decorView是viewGroup的子类，
+所以调用的是viewGroup的dispatchTouchEvent()方法
+
+Activity事件的分发机制：
+                点击、触摸
+                    |
+    Activity.dispatchTouchEvent()
+     [一般情况下是action_down事件]
+                    |
+    getWindow().dispatchTouchEvent()
+                    |
+    mDecor.superDispatchTouchEvent()
+    [即ViewGroup.dispatchTouchEvent()
+     即事件从Activity -> ViewGroup]   ——(false)——> Activity.OnTouchEvent() [默认都返回false，当在
+                    |                                          window外返回true并finish，如home三键]
+                    |(true)
+       Activity.dispatchTouchEvent() 结束传递
+
+ViewGroup事件的分发机制：
+  开始 ——> 调用该控件所在布局的ViewGroup.dispatchTouchEvent() ——> 调用ViewGroup.onInterceptTouchEvent()
+  —(false)—> 允许事件继续向子View传递 ——> 遍历所有子View并找到点击的子View ——> 调用所点击子View的
+             dispatchTouchEvent()方法[事件从 ViewGroup -> View 层] ==> end
+  —(true/无下级接受者时)—> 不允许向下传递事件 ——> 调用父类(View)的dispatchTouchEvent()方法 ——> 自己处理
+             该事件[ onTouch() -> onTouchEvent() -> performClick() -> onClick() ] ==> end
+
+View事件的分发机制：
+  开始 ——> 调用View.dispatchTouchEvent() ——> 调用View.onTouch() ——> onTouch()返回值
+  —(false)—> onTouchEvent() ——> performClick() ——> onClick()  ==> end
+  —(true)—> 不在向下传递事件 ==> end
+
+
+
+
+

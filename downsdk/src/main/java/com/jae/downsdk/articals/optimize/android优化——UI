@@ -1,0 +1,110 @@
+页面布局优化：
+ 1、页面卡顿问题：过度绘制
+    蓝色，淡绿，淡红，深红代表了4种不同程度的Overdraw情况，
+    蓝色： 意味着overdraw 1倍。像素绘制了两次。大片的蓝色还是可以接受的（若整个窗口是蓝色的，可以摆脱一层）。
+    绿色： 意味着overdraw 2倍。像素绘制了三次。中等大小的绿色区域是可以接受的但你应该尝试优化、减少它们。
+    淡红： 意味着overdraw 3倍。像素绘制了四次，小范围可以接受。
+    深红： 意味着overdraw 4倍。像素绘制了五次或者更多。这是错误的，要修复它们。
+
+ 2、处理方案：
+    通过Hierarchy Viewer去检测渲染效率，去除不必要的嵌套
+    通过Show GPU Overdraw去检测Overdraw，最终可以通过移除不必要的背景。
+    去除viewTree中不必要的背景色/图案，尤其是在列表中
+    去除decorView的背景色：getWindow().setBackgroundDrawable(null);
+    使用布局标签优化布局<include><merge><viewStub>
+    减少使用relativeLayout，使用constraintLayout代替实现复杂布局
+    自定义view的onDraw()方法中不要创建局部变量、不要进行耗时操作.
+
+ListView、RecyclerView优化：
+    1、数据处理和视图加载分离
+    - 数据的处理逻辑应该放在异步处理，这样 Adapter 在 notifyChanged 后，ViewHolder 就可以简单无压力地做数据
+    与视图的绑定逻辑例如Html.fromHtml(data) 方法可能就是比较耗时的，存在多个 TextView 的话耗时会更为严重，
+    这样便会引发掉帧、卡顿，而如果把这一步与网络异步线程放在一起，站在用户角度，最多就是网络刷新时间稍长一点
+    2、数据优化
+    - 分页拉取远端数据，对拉取下来的远端数据进行缓存，提升二次加载速度；对于新增或者删除数据通过
+    DiffUtil 来进行局部刷新数据，而不是一味地全局刷新数据。
+    3、布局优化
+    - 减少 xml文件inflate时间。xml文件inflate是通过耗时的IO操作。可以使用代码去生成布局，即new View()的方式。
+    - 减少View对象的创建。多 ViewType 能够共用的部分尽量设计成自定义 View，减少 View 的构造和嵌套。
+    设置高度固定。如果item高度是固定的话，可以使用setHasFixedSize(true) 来避免requestLayout浪费资源。
+    - 共用RecycledViewPool，在嵌套RecyclerView中，如果子RecyclerView具有相同的adapter，那么可以设置
+    setRecycledViewPool(pool)来共用一个RecycledViewPool。
+    Note: 如果内部嵌套recyclerView的LayoutManager是LinearLayoutManager或其子类，需要手动开启这个特性：
+    layout.setRecycleChildrenOnDetach(true)。
+     例：/***
+        class OuterAdapter extends RecyclerView.Adapter<OuterAdapter.ViewHolder> {
+               RecyclerView.RecycledViewPool mSharedPool = new RecyclerView.RecycledViewPool();
+               ...
+               @Override
+               public OuterAdapter.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+
+                   RecyclerView innerLLM = new RecyclerView(inflater.getContext());
+
+                   LinearLayoutManager innerLLM = new LinearLayoutManager(parent.getContext(), LinearLayoutManager.HORIZONTAL);
+                   innerLLM.setRecycleChildrenOnDetach(true);
+                   innerRv.setLayoutManager(innerLLM);
+                   innerRv.setRecycledViewPool(mSharedPool);
+                   return new OuterAdapter.ViewHolder(innerRv);
+               }
+        ***/
+    - RecyclerView数据预取，setInitialItemsPrefetchCount(num);
+    - 加大RecyclerView的缓存,用空间换时间，来提高滚动的流畅性。
+      例：/***
+         recyclerView.setItemViewCacheSize(20);
+         recyclerView.setDrawingCacheEnabled(true);
+         recyclerView.setDrawingCacheQuality(View.DRAWING_CACHE_QUALITY_HIGH);
+        ***/
+    - 增加RecyclerView预留的额外空间(显示范围之外，应该额外缓存的空间)
+      例：/***
+        new LinearLayoutManager(this) {
+            @Override
+            protected int getExtraLayoutSpace(RecyclerView.State state) {
+                return size;
+            }
+        };
+        ***/
+    - 减少ItemView监听器的创建,共用一个listener
+    - 优化滑动操作，设置RecyclerView.addOnScrollListener();来在滑动过程中停止加载的操作。
+    - 处理刷新闪烁，调用notifyDataSetChange时，适配器不知道整个数据集中的那些内容以及存在，
+    再重新匹配ViewHolder时会花生闪烁。设置adapter.setHasStableIds(true)，
+    并重写getItemId()来给每个Item一个唯一的ID。
+    - 回收资源，通过重写RecyclerView.onViewRecycled(holder)来回收资源。
+
+冷启动延迟白屏问题：
+    1、为了更顺滑无缝衔接我们的闪屏页，可以在启动 Activity 的 Theme中设置闪屏页图片，这样启动窗口的图片就会
+       是闪屏页图片，而不是白屏。设置闪屏图片主题代码
+        例： /***
+            <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+               <item name="android:windowBackground">@drawable/lunch</item>  //闪屏页图片
+               <item name="android:windowFullscreen">true</item>
+               <item name="android:windowDrawsSystemBarBackgrounds">false</item><!--显示虚拟按键，并腾出空间-->
+            </style>
+          ***/
+    2、adb命令 : adb shell am start -S -W 包名/启动类的全限定名 ， -S 表示重启当前应用
+     例:  Activity: com.example.demo/.MainActivity
+         ThisTime: 2247     (最后一个 Activity 的启动耗时，优化点)
+         TotalTime: 2247    (启动一连串的 Activity 总耗时)
+         WaitTime: 2278     (应用进程的创建过程 + TotalTime)
+     日志过滤：displayed字段，查看时间
+    3、Application 优化，可以根据需要初始化的组件的轻重缓急，做一下分类：
+     - 必要的组件一定要在主线程中立即初始化(入口 Activity 可能立即会用到)
+     - 组件一定要在主线程中初始化，但是可以延迟初始化。
+     - 组件可以在子线程中初始化。
+     例：将Bugly，x5内核初始化，SP的读写，友盟等组件放到子线程中初始化。
+            new Thread(new Runnable() {
+                 @Override
+                 public void run() {
+                     //设置线程的优先级，不与主线程抢资源
+                     Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+     				//子线程初始化第三方组件
+     				Thread.sleep(5000);//建议延迟初始化，可以发现是否影响其它功能，或者是崩溃！
+                 }
+             }).start();
+     - 将需要在主线程中初始化但是可以不用立即完成的动作延迟加载
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+        				//延迟初始化组件
+                    }
+                }, 3000);
+

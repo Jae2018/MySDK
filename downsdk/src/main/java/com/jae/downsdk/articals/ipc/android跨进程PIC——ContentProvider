@@ -1,0 +1,5 @@
+ContentProvider在进行跨进程数据传递时，利用了 Binder 和 匿名共享内存 机制。
+概述：通过Binder传递CursorWindow对象内部的匿名共享内存的fd(文件描述符)。这样的话数据不需要跨进程，
+而是在不同的进程中通过fd来操作同一块匿名内存。
+Android的Binder传输是有大小限制的，一般来说是 1~2M
+

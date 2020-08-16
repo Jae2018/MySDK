@@ -1,0 +1,33 @@
+
+电量消耗分析工具：Battery Historian(https://github.com/google/battery-historian)
+
+1、减少操作：是否存在可删减的多余操作
+           例如网络数据的多级缓存(内存/本地/网络缓存,需要跟服务端协商策略);本地数据库的IO操作(集中批量处理);
+           SP的数据保存问题(SP读取是全部读取)
+2、推迟操作：是否需要立即执行某项操作
+           例如可以等到设备充电后再将数据备份到云端，
+3、合并操作：例如连接上网络期间统一传输消息/进行网络数据请求
+
+1、监听充电状态，耗电代码放到充电后运行
+2、屏幕唤醒后有一段时间可以进行业务代码
+3、使用jobScheduler运行不需要实时运行的代码
+4、wakelock唤醒锁定要及时释放资源，最好使用WorkManger代替原有方法。
+  代码示例：
+    @Throws(MyException::class)
+    fun doSomethingAndRelease() {
+        wakeLock.apply {
+            try {
+                acquire()
+                doSomethingThatThrows()
+            } finally {
+                release()
+            }
+        }
+    }
+5、GPS  选择合适的 Location Provider；及时注销定位监听；多模块使用定位尽量复
+6、传感器  使用传感器，选择合适的采样率，越高的采样率类型则越费电。在后台时注意及时注销传感器监听
+
+
+
+
+
